@@ -14,3 +14,25 @@ class PriorityQueue:
     
     def __len__(self):
         return len(self._queue)
+
+if __name__ == "__main__":
+
+    print("Expected Output:\n")
+    print("Second")
+    print("First")
+    print("Third")
+    print("Fourth")
+
+    queue = PriorityQueue()
+
+    queue.push(3, "First")
+    queue.push(1, "Second")
+    queue.push(100, "Third")
+    queue.push(100, "Fourth")
+
+    print("\nOutput:\n")
+
+    while queue:
+        print(queue.pop())
+
+    
