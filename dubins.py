@@ -35,3 +35,5 @@ class DubinsCurve:
     def get_transform(self, distance):
         time = self.get_time(distance)
         return expm(self._twist * time)
+
+CurveList = list[DubinsCurve]
