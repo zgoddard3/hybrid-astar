@@ -38,7 +38,7 @@ class HybridAStarSolver:
                 heading is ignored. This can be changed via the goal check function 
                 in the constructor.
         """
-        queue = PriorityQueue()
+        queue = PriorityQueue(self.get_cell)
         costs = defaultdict(lambda : np.inf)
         predecessors = defaultdict(lambda : None)
         closed = set()
@@ -57,11 +57,7 @@ class HybridAStarSolver:
         while queue:
             transform = queue.pop()
             cell = self.get_cell(transform)
-
-            if cell in closed:
-                continue
-            else:
-                closed.add(cell)
+            closed.add(cell)
 
             if self.goal_check(cell, goal_cell):
                 break
@@ -70,16 +66,12 @@ class HybridAStarSolver:
                 child_cell = self.get_cell(child)
                 if child_cell in closed:
                     continue
-                
-                # Check if new cost is better than old cost.
-                # We'll just re-add the node to the queue if it already exists, since heapq
-                # doesn't have a convenient way to update keys. To account for this we check
-                # if the node is closed right after popping it from the queue
+
                 cost += costs[cell]
                 if costs[child_cell] < cost:
                     predecessors[child_cell] = curve, transform
                     costs[child_cell] = cost
-                
+                    queue.push(cost + self.heuristic(child, goal), child)
     
     def children(self, transform):
         out = []
