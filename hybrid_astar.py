@@ -26,12 +26,15 @@ class HybridAStarSolver:
         self.curves = curves.copy()
         self.heuristics = heuristics.copy()
         self.cell_size = np.array(cell_size)
+        self.distance = np.sqrt(3) * self.cell_size[:3].max()
         self.goal_check = goal_check or (lambda x, g : all([i == j for i,j in zip(x[:3], g[:3])]))
 
         self.queue = PriorityQueue(self.get_cell)
         self.costs = defaultdict(lambda : np.inf)
         self.predecessors = defaultdict(lambda : None)
         self.closed = set()
+
+        self.final = None
     
     def solve(self, start, goal):
         """
@@ -60,32 +63,36 @@ class HybridAStarSolver:
         goal_transform[:2,:2] = rot(goal[3])
         goal_cell = self.get_cell(goal_transform)
 
+        self.queue.push(self.heuristic(transform, goal_transform), transform)
+        cell = self.get_cell(transform)
+        self.costs[cell] = 0
+
         while self.queue:
             transform = self.queue.pop()
             cell = self.get_cell(transform)
             self.closed.add(cell)
 
             if self.goal_check(cell, goal_cell):
+                self.final = transform
                 break
 
-            for child, cost, curve in self.children(transform):
+            for child, curve in self.children(transform):
                 child_cell = self.get_cell(child)
                 if child_cell in self.closed:
                     continue
 
-                cost += self.costs[cell]
-                if self.costs[child_cell] < cost:
+                cost = self.costs[cell] + self.distance
+                if self.costs[child_cell] > cost:
                     self.predecessors[child_cell] = curve, transform
                     self.costs[child_cell] = cost
                     self.queue.push(cost + self.heuristic(child, goal_transform), child)
     
     def children(self, transform):
         out = []
-        distance = np.sqrt(3) * self.cell_size
         for curve in self.curves:
-            trans = curve.get_transform(distance)
+            trans = curve.get_transform(self.distance)
             trans = transform.dot(trans)
-            out.append((trans, distance, curve))
+            out.append((trans, curve))
         return out
     
     def heuristic(self, start, goal):
@@ -97,18 +104,33 @@ class HybridAStarSolver:
         Calculates which cell a transformation matrix occupies.
         """
         offset = self.cell_size / 2
+        cell = [0] * 4
 
         xyz = transform[:3,3] + offset[:3]
         xyz /= self.cell_size[:3]
-        cell_xyz = np.floor(xyz).astype(int)
+        cell[:3] = np.floor(xyz).astype(int)
 
         psi = np.arctan2(transform[1,0], transform[0,0])
         psi += offset[3]
         psi %= 2*np.pi
         psi /= self.cell_size[3]
-        cell_psi = np.floor(psi).astype(int)
+        cell[3] = np.floor(psi).astype(int)
 
-        return tuple(*cell_xyz, cell_psi)
+        return tuple(cell)
+    
+    def get_path(self, goal=None):
+        if goal is None:
+            goal = self.final
+        cell = self.get_cell(goal)
+        traj = []
+        while self.predecessors[cell] is not None:
+            curve, transform = self.predecessors[cell]
+            traj.append(curve.get_trajectory(self.distance, init_trans=transform)[0])
+            cell = self.get_cell(transform)
+        
+        traj.reverse()
+        return np.vstack(traj)
+
 
 def euclidean_distance(start, goal):
     return np.linalg.norm(goal[:3,3] - start[:3,3])
@@ -124,6 +146,24 @@ if __name__ == "__main__":
     for rate, angle in product(turn_rates, angles):
         primitives.append(DubinsCurve(rate, angle, speed))
 
-    solver = HybridAStarSolver(primitives, [euclidean_distance], 1)
+    solver = HybridAStarSolver(primitives, [euclidean_distance], (1,1,1,np.pi/4))
 
-    solver.solve()
+    start = (0,0,0,0)
+    goal = (5,5,5,0)
+
+    solver.solve(start, goal)
+
+    path = solver.get_path()
+
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.plot(*path.T)
+    ax.scatter(goal[0], goal[1], goal[2], color='green', s=100)
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    ax.set_zlabel('Z [m]')
+    ax.set_aspect('equal')
+    plt.savefig("example_path.png")
+    plt.show()

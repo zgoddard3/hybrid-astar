@@ -70,22 +70,6 @@ if __name__ == "__main__":
     ax.set_xlabel('X [m]')
     ax.set_ylabel('Y [m]')
     ax.set_zlabel('Z [m]')
-    plt.show(block=False)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    
-    shuffle(primitives)
-    trans = np.eye(4)
-    traj = []
-    for curve in primitives:
-        points, trans = curve.get_trajectory(1.5, init_trans=trans)
-        traj.append(points)
-    traj = np.vstack(traj)
-    plt.plot(*traj.T)
-    
-    ax.set_xlabel('X [m]')
-    ax.set_ylabel('Y [m]')
-    ax.set_zlabel('Z [m]')
-    ax.set_aspect('equal')
+    plt.savefig("example_curves.png")
     plt.show()
+    
