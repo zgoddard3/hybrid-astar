@@ -29,6 +29,11 @@ class PriorityQueue:
     
     def __len__(self):
         return len(self._lookup)
+    
+    def clear(self):
+        self._queue.clear()
+        self._count = 0
+        self._lookup.clear()
 
 if __name__ == "__main__":
 

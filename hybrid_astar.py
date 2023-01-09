@@ -27,6 +27,11 @@ class HybridAStarSolver:
         self.heuristics = heuristics.copy()
         self.cell_size = np.array(cell_size)
         self.goal_check = goal_check or (lambda x, g : all([i == j for i,j in zip(x[:3], g[:3])]))
+
+        self.queue = PriorityQueue(self.get_cell)
+        self.costs = defaultdict(lambda : np.inf)
+        self.predecessors = defaultdict(lambda : None)
+        self.closed = set()
     
     def solve(self, start, goal):
         """
@@ -38,10 +43,11 @@ class HybridAStarSolver:
                 heading is ignored. This can be changed via the goal check function 
                 in the constructor.
         """
-        queue = PriorityQueue(self.get_cell)
-        costs = defaultdict(lambda : np.inf)
-        predecessors = defaultdict(lambda : None)
-        closed = set()
+        
+        self.queue.clear()
+        self.costs.clear()
+        self.predecessors.clear()
+        self.closed.clear()
 
         # Convert start to a transformation matrix
         transform = np.eye(4)
@@ -54,24 +60,24 @@ class HybridAStarSolver:
         goal_transform[:2,:2] = rot(goal[3])
         goal_cell = self.get_cell(goal_transform)
 
-        while queue:
-            transform = queue.pop()
+        while self.queue:
+            transform = self.queue.pop()
             cell = self.get_cell(transform)
-            closed.add(cell)
+            self.closed.add(cell)
 
             if self.goal_check(cell, goal_cell):
                 break
 
             for child, cost, curve in self.children(transform):
                 child_cell = self.get_cell(child)
-                if child_cell in closed:
+                if child_cell in self.closed:
                     continue
 
-                cost += costs[cell]
-                if costs[child_cell] < cost:
-                    predecessors[child_cell] = curve, transform
-                    costs[child_cell] = cost
-                    queue.push(cost + self.heuristic(child, goal), child)
+                cost += self.costs[cell]
+                if self.costs[child_cell] < cost:
+                    self.predecessors[child_cell] = curve, transform
+                    self.costs[child_cell] = cost
+                    self.queue.push(cost + self.heuristic(child, goal_transform), child)
     
     def children(self, transform):
         out = []
@@ -105,4 +111,19 @@ class HybridAStarSolver:
         return tuple(*cell_xyz, cell_psi)
 
 def euclidean_distance(start, goal):
-    pass
+    return np.linalg.norm(goal[:3,3] - start[:3,3])
+
+if __name__ == "__main__":
+    from itertools import product
+    from dubins import DubinsCurve
+
+    primitives = []
+    speed = 1.0
+    turn_rates = [-1., 0., 1.]
+    angles = [-.5, 0., .5]
+    for rate, angle in product(turn_rates, angles):
+        primitives.append(DubinsCurve(rate, angle, speed))
+
+    solver = HybridAStarSolver(primitives, [euclidean_distance], 1)
+
+    solver.solve()
